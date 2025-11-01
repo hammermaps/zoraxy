@@ -221,7 +221,12 @@ func (m *Middleware) serveCachedResponse(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(meta.StatusCode)
 
 	// Stream response body and track bytes sent
-	bytesSent, _ := io.Copy(w, reader)
+	bytesSent, err := io.Copy(w, reader)
+	if err != nil {
+		// Error writing response to client (e.g., client disconnected)
+		// This is not critical in middleware context, but we skip traffic tracking
+		return
+	}
 	
 	// Notify about traffic
 	if m.config.OnCacheEvent != nil && bytesSent > 0 {

@@ -8,9 +8,9 @@ import (
 func TestHostStatistics(t *testing.T) {
 	// Create a test statistics object
 	stats := &HostStatistics{
-		Hostname:     "test.example.com",
-		MinBandwidth: -1,
-		LastUpdated:  time.Now(),
+		Hostname:             "test.example.com",
+		MinBandwidthRecorded: false,
+		LastUpdated:          time.Now(),
 	}
 
 	// Test recording requests

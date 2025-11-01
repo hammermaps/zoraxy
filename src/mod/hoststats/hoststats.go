@@ -20,7 +20,7 @@ import (
 
 const (
 	BANDWIDTH_SAMPLE_INTERVAL = 5 * time.Second // Sample bandwidth every 5 seconds
-	MAX_BANDWIDTH_SAMPLES     = 288             // Keep 24 hours of 5-minute samples (288 * 5min = 24h)
+	MAX_BANDWIDTH_SAMPLES     = 17280           // Keep 24 hours of samples (24h * 60min * 60sec / 5sec = 17280)
 )
 
 // HostStatistics holds statistics for a single host
@@ -42,9 +42,10 @@ type HostStatistics struct {
 	BytesReceived int64 `json:"bytes_received"` // Total bytes received from upstream
 
 	// Bandwidth statistics (bytes per second)
-	CurrentBandwidth int64 `json:"current_bandwidth"` // Current bandwidth usage
-	MaxBandwidth     int64 `json:"max_bandwidth"`     // Maximum bandwidth observed
-	MinBandwidth     int64 `json:"min_bandwidth"`     // Minimum bandwidth observed (non-zero)
+	CurrentBandwidth    int64 `json:"current_bandwidth"`     // Current bandwidth usage
+	MaxBandwidth        int64 `json:"max_bandwidth"`         // Maximum bandwidth observed
+	MinBandwidth        int64 `json:"min_bandwidth"`         // Minimum bandwidth observed (non-zero)
+	MinBandwidthRecorded bool  `json:"min_bandwidth_recorded"` // Whether MinBandwidth has been set
 
 	// Time-series bandwidth data for graphical display
 	BandwidthSamples []BandwidthSample `json:"bandwidth_samples"`
@@ -142,9 +143,9 @@ func (c *Collector) RecordRequest(hostname string, cached bool) {
 	stats, exists := c.stats[hostname]
 	if !exists {
 		stats = &HostStatistics{
-			Hostname:    hostname,
-			LastUpdated: time.Now(),
-			MinBandwidth: -1, // Initialize to -1 to indicate no bandwidth recorded yet
+			Hostname:             hostname,
+			LastUpdated:          time.Now(),
+			MinBandwidthRecorded: false,
 		}
 		c.stats[hostname] = stats
 	}
@@ -174,9 +175,9 @@ func (c *Collector) RecordTraffic(hostname string, bytesSent, bytesReceived int6
 	stats, exists := c.stats[hostname]
 	if !exists {
 		stats = &HostStatistics{
-			Hostname:    hostname,
-			LastUpdated: time.Now(),
-			MinBandwidth: -1,
+			Hostname:             hostname,
+			LastUpdated:          time.Now(),
+			MinBandwidthRecorded: false,
 		}
 		c.stats[hostname] = stats
 	}
@@ -196,9 +197,9 @@ func (c *Collector) RecordCacheData(hostname string, dataSizeDelta int64, object
 	stats, exists := c.stats[hostname]
 	if !exists {
 		stats = &HostStatistics{
-			Hostname:    hostname,
-			LastUpdated: time.Now(),
-			MinBandwidth: -1,
+			Hostname:             hostname,
+			LastUpdated:          time.Now(),
+			MinBandwidthRecorded: false,
 		}
 		c.stats[hostname] = stats
 	}
@@ -250,8 +251,9 @@ func (c *Collector) startBandwidthSampling() {
 					}
 
 					// Update min bandwidth (ignore zero values)
-					if bandwidth > 0 && (stats.MinBandwidth == -1 || bandwidth < stats.MinBandwidth) {
+					if bandwidth > 0 && (!stats.MinBandwidthRecorded || bandwidth < stats.MinBandwidth) {
 						stats.MinBandwidth = bandwidth
+						stats.MinBandwidthRecorded = true
 					}
 
 					// Add bandwidth sample
@@ -374,7 +376,8 @@ func (c *Collector) ResetHostStats(hostname string) {
 	stats.BytesReceived = 0
 	stats.CurrentBandwidth = 0
 	stats.MaxBandwidth = 0
-	stats.MinBandwidth = -1
+	stats.MinBandwidth = 0
+	stats.MinBandwidthRecorded = false
 	stats.BandwidthSamples = []BandwidthSample{}
 	stats.LastUpdated = time.Now()
 }
