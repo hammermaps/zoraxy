@@ -1,0 +1,148 @@
+# Zoraxy Build Configuration
+# This file defines build parameters and configuration for Jenkins builds
+
+project:
+  name: zoraxy
+  description: "A general purpose HTTP reverse proxy and forwarding tool written in Go"
+  repository: "https://github.com/tobychui/zoraxy"
+
+build:
+  # Go version requirement
+  go_version: "1.24"
+  
+  # Source directory
+  source_dir: "src"
+  
+  # Output directory
+  output_dir: "src/dist"
+  
+  # Build flags
+  build_flags:
+    ldflags: "-s -w"
+    trimpath: true
+    cgo_enabled: false
+  
+  # Supported platforms
+  platforms:
+    - os: linux
+      arch: amd64
+      enabled: true
+    - os: linux
+      arch: arm64
+      enabled: true
+    - os: linux
+      arch: arm
+      goarm: 6
+      enabled: true
+    - os: linux
+      arch: 386
+      enabled: true
+    - os: linux
+      arch: mipsle
+      enabled: true
+    - os: linux
+      arch: riscv64
+      enabled: true
+    - os: windows
+      arch: amd64
+      extension: .exe
+      enabled: true
+    - os: darwin
+      arch: amd64
+      enabled: true
+    - os: freebsd
+      arch: amd64
+      enabled: true
+
+docker:
+  # Docker build configuration
+  enabled: true
+  
+  # Docker registry (configure in Jenkins credentials)
+  registry: "docker.io"
+  
+  # Image name
+  image_name: "zoraxy"
+  
+  # Build platforms for Docker
+  platforms:
+    - linux/amd64
+    - linux/arm64
+  
+  # Dockerfile location
+  dockerfile: "docker/Dockerfile"
+
+testing:
+  # Test configuration
+  enabled: true
+  
+  # Test flags
+  flags:
+    - "-v"
+    - "-race"
+    - "-coverprofile=coverage.out"
+  
+  # Test timeout
+  timeout: "10m"
+
+quality:
+  # Code quality checks
+  linting:
+    enabled: true
+    tool: "golangci-lint"
+  
+  formatting:
+    enabled: true
+    tool: "gofmt"
+  
+  security_scan:
+    enabled: false
+    tool: "gosec"
+
+artifacts:
+  # Artifact configuration
+  checksums:
+    enabled: true
+    algorithms:
+      - sha256
+      - md5
+  
+  # Archive format for release
+  archive_format: "tar.gz"
+  
+  # Files to include in release archive
+  include_files:
+    - "README.md"
+    - "LICENSE"
+    - "CHANGELOG.md"
+
+notifications:
+  # Notification configuration
+  email:
+    enabled: true
+    on_success: true
+    on_failure: true
+    attach_log_on_failure: true
+
+jenkins:
+  # Jenkins-specific configuration
+  
+  # Build triggers
+  triggers:
+    scm_poll: "H/15 * * * *"  # Poll every 15 minutes
+    cron: "H 2 * * *"  # Nightly build at 2 AM
+  
+  # Build retention
+  retention:
+    days_to_keep: 30
+    num_to_keep: 10
+    artifact_days_to_keep: 15
+    artifact_num_to_keep: 5
+  
+  # Concurrent builds
+  concurrent_builds: false
+  
+  # Build timeout
+  timeout:
+    time: 60
+    unit: "MINUTES"

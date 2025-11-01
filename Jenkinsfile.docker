@@ -1,0 +1,228 @@
+// Jenkinsfile for Docker-specific builds
+// This pipeline focuses on building and pushing Docker images
+
+pipeline {
+    agent {
+        label 'docker'
+    }
+    
+    parameters {
+        string(
+            name: 'DOCKER_TAG',
+            defaultValue: 'latest',
+            description: 'Docker image tag'
+        )
+        booleanParam(
+            name: 'PUSH_TO_REGISTRY',
+            defaultValue: false,
+            description: 'Push image to Docker registry'
+        )
+        choice(
+            name: 'PLATFORMS',
+            choices: ['linux/amd64,linux/arm64', 'linux/amd64', 'linux/arm64'],
+            description: 'Target platforms for multi-arch build'
+        )
+    }
+    
+    environment {
+        PROJECT_NAME = 'zoraxy'
+        DOCKER_IMAGE = 'zoraxy'
+        DOCKER_REGISTRY = credentials('docker-registry-credentials')
+    }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 2, unit: 'HOURS')
+        timestamps()
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.BUILD_DATE = sh(
+                        script: "date -u +'%Y-%m-%dT%H:%M:%SZ'",
+                        returnStdout: true
+                    ).trim()
+                }
+            }
+        }
+        
+        stage('Prepare Build Context') {
+            steps {
+                echo 'Preparing Docker build context...'
+                sh '''
+                    # Copy source files to docker directory
+                    cp -r src/ docker/src/
+                    
+                    # Verify files
+                    ls -la docker/
+                '''
+            }
+        }
+        
+        stage('Docker Build') {
+            steps {
+                script {
+                    echo "Building Docker image: ${DOCKER_IMAGE}:${params.DOCKER_TAG}"
+                    
+                    dir('docker') {
+                        sh """
+                            # Build multi-arch image using buildx
+                            docker buildx create --name zoraxy-builder --use || true
+                            docker buildx inspect --bootstrap
+                            
+                            docker buildx build \
+                                --platform ${params.PLATFORMS} \
+                                --build-arg VERSION=${params.DOCKER_TAG} \
+                                --build-arg BUILD_DATE=${env.BUILD_DATE} \
+                                --build-arg VCS_REF=${env.GIT_COMMIT_SHORT} \
+                                --tag ${DOCKER_IMAGE}:${params.DOCKER_TAG} \
+                                --tag ${DOCKER_IMAGE}:${env.GIT_COMMIT_SHORT} \
+                                ${params.PUSH_TO_REGISTRY ? '--push' : '--load'} \
+                                .
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Test Docker Image') {
+            when {
+                expression { params.PUSH_TO_REGISTRY == false }
+            }
+            steps {
+                echo 'Testing Docker image...'
+                sh """
+                    # Start container
+                    docker run -d \
+                        --name zoraxy-test-${BUILD_NUMBER} \
+                        -p 18000:8000 \
+                        ${DOCKER_IMAGE}:${params.DOCKER_TAG}
+                    
+                    # Wait for startup
+                    sleep 10
+                    
+                    # Test if service is responding
+                    curl -f http://localhost:18000 || echo "Service not ready yet"
+                    
+                    # Stop and remove container
+                    docker stop zoraxy-test-${BUILD_NUMBER}
+                    docker rm zoraxy-test-${BUILD_NUMBER}
+                """
+            }
+        }
+        
+        stage('Tag and Push') {
+            when {
+                expression { params.PUSH_TO_REGISTRY == true }
+            }
+            steps {
+                script {
+                    echo 'Tagging and pushing to registry...'
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-registry-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                            # Login to Docker registry
+                            echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                            
+                            # Tag for registry
+                            docker tag ${DOCKER_IMAGE}:${params.DOCKER_TAG} \
+                                ${DOCKER_USER}/${DOCKER_IMAGE}:${params.DOCKER_TAG}
+                            
+                            docker tag ${DOCKER_IMAGE}:${env.GIT_COMMIT_SHORT} \
+                                ${DOCKER_USER}/${DOCKER_IMAGE}:${env.GIT_COMMIT_SHORT}
+                            
+                            # Push to registry
+                            docker push ${DOCKER_USER}/${DOCKER_IMAGE}:${params.DOCKER_TAG}
+                            docker push ${DOCKER_USER}/${DOCKER_IMAGE}:${env.GIT_COMMIT_SHORT}
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Generate Image Manifest') {
+            steps {
+                echo 'Generating image manifest...'
+                sh """
+                    # Get image information
+                    docker inspect ${DOCKER_IMAGE}:${params.DOCKER_TAG} > docker-image-manifest.json
+                    
+                    # Generate summary
+                    cat > docker-image-info.txt <<EOF
+Docker Image Build Information
+==============================
+Image: ${DOCKER_IMAGE}:${params.DOCKER_TAG}
+Git Commit: ${env.GIT_COMMIT_SHORT}
+Build Date: ${env.BUILD_DATE}
+Platforms: ${params.PLATFORMS}
+Pushed to Registry: ${params.PUSH_TO_REGISTRY}
+Build Number: ${BUILD_NUMBER}
+EOF
+                    
+                    cat docker-image-info.txt
+                """
+                archiveArtifacts artifacts: 'docker-image-*.json,docker-image-*.txt', fingerprint: true
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo '✓ Docker build completed successfully!'
+            script {
+                def message = """
+Docker Build Success ✓
+
+Image: ${DOCKER_IMAGE}:${params.DOCKER_TAG}
+Platforms: ${params.PLATFORMS}
+Git Commit: ${env.GIT_COMMIT_SHORT}
+Build Date: ${env.BUILD_DATE}
+Pushed: ${params.PUSH_TO_REGISTRY}
+
+Build URL: ${env.BUILD_URL}
+                """
+                
+                emailext (
+                    subject: "✓ Docker Build Success: ${DOCKER_IMAGE}:${params.DOCKER_TAG}",
+                    body: message,
+                    to: '${DEFAULT_RECIPIENTS}'
+                )
+            }
+        }
+        
+        failure {
+            echo '✗ Docker build failed!'
+            emailext (
+                subject: "✗ Docker Build Failed: ${DOCKER_IMAGE}:${params.DOCKER_TAG}",
+                body: "Docker build failed. Check console output: ${env.BUILD_URL}console",
+                to: '${DEFAULT_RECIPIENTS}',
+                attachLog: true
+            )
+        }
+        
+        always {
+            echo 'Cleaning up...'
+            sh '''
+                # Clean up build context
+                rm -rf docker/src/ || true
+                
+                # Clean up test containers
+                docker ps -a | grep "zoraxy-test-" | awk '{print $1}' | xargs -r docker rm -f || true
+                
+                # Clean up builder
+                docker buildx rm zoraxy-builder || true
+            '''
+        }
+    }
+}
