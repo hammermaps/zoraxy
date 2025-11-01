@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.6
 
 require (
+	github.com/andybalholm/brotli v1.2.0
 	github.com/armon/go-radix v1.0.0
 	github.com/boltdb/bolt v1.3.1
 	github.com/docker/docker v27.0.0+incompatible
@@ -19,9 +20,11 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.26
 	github.com/monperrus/crawler-user-agents v1.1.0
 	github.com/pires/go-proxyproto v0.8.1
+	github.com/redis/go-redis/v9 v9.16.0
 	github.com/shirou/gopsutil/v4 v4.25.1
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/tdewolff/minify/v2 v2.24.5
 	golang.org/x/net v0.46.0
 	golang.org/x/oauth2 v0.32.0
 	golang.org/x/text v0.30.0
@@ -37,7 +40,9 @@ require (
 	github.com/aziontech/azionapi-go-sdk v0.143.0 // indirect
 	github.com/baidubce/bce-sdk-go v0.9.250 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dnsimple/dnsimple-go/v4 v4.0.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-acme/alidns-20150109/v4 v4.6.1 // indirect
@@ -51,6 +56,7 @@ require (
 	github.com/nrdcg/goacmedns v0.2.0 // indirect
 	github.com/nrdcg/vegadns v0.3.0 // indirect
 	github.com/regfish/regfish-dnsapi-go v0.1.1 // indirect
+	github.com/tdewolff/parse/v2 v2.8.5-0.20251020133559-0efcf90bef1a // indirect
 	github.com/yandex-cloud/go-sdk/services/dns v0.0.16 // indirect
 	github.com/yandex-cloud/go-sdk/v2 v2.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

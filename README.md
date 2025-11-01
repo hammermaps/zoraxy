@@ -14,6 +14,11 @@ A general purpose HTTP reverse proxy and forwarding tool. Now written in Go!
   - Alias Hostnames
   - Custom Headers
   - Load Balancing
+- Response Caching **NEW**
+  - Multiple backends (Filesystem, Redis, Varnish)
+  - Content optimization (minification, compression)
+  - Async/sync optimization modes
+  - Admin API for purging and monitoring
 - Redirection Rules
 - TLS / SSL setup and deploy
   - ACME features like auto-renew to serve your sites in http**s**
