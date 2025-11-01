@@ -128,7 +128,7 @@
         });
         
         function loadHostList() {
-            $.get("/api/proxy/list", function(data) {
+            $.get("/api/proxy/list?type=host", function(data) {
                 var select = $('#hostnameSelect');
                 select.empty();
                 select.append('<option value="">Select a host...</option>');
