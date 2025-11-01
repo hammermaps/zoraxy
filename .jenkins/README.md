@@ -4,10 +4,23 @@ This directory contains Jenkins configuration files and documentation for settin
 
 ## Files
 
-- **`Jenkinsfile`** (in project root) - Standard Jenkins pipeline for basic builds
-- **`Jenkinsfile.advanced`** (in project root) - Advanced pipeline with additional features
-- **`build-config.yml`** - Build configuration parameters
-- **`setup-guide.md`** - Detailed setup instructions
+### Pipeline Files (Project Root)
+- **[`Jenkinsfile`](../Jenkinsfile)** - Standard Jenkins pipeline for basic builds
+- **[`Jenkinsfile.advanced`](../Jenkinsfile.advanced)** - Advanced pipeline with additional features
+- **[`Jenkinsfile.docker`](../Jenkinsfile.docker)** - Docker-focused pipeline
+
+### Configuration Files
+- **[`build-config.yml`](build-config.yml)** - Build configuration parameters
+- **[`jenkins-job-config.xml`](jenkins-job-config.xml)** - Jenkins job XML template
+
+### Documentation
+- **[`setup-guide.md`](setup-guide.md)** - Detailed setup instructions
+- **[`QUICK-REFERENCE.md`](QUICK-REFERENCE.md)** - Quick reference and cheat sheet
+- **[`FAQ.md`](FAQ.md)** - Frequently asked questions
+
+### Utilities
+- **[`validate-jenkinsfiles.sh`](validate-jenkinsfiles.sh)** - Validation script for Jenkinsfiles
+- **[`examples/`](examples/)** - Example pipeline configurations
 
 ## Quick Setup
 
