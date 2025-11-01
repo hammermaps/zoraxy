@@ -77,11 +77,13 @@ func (ah *AdminHandler) HandlePurge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.SendJSONResponse(w, map[string]interface{}{
+	response := map[string]interface{}{
 		"success": true,
 		"message": "Cache entry purged successfully",
 		"key":     req.Key,
-	})
+	}
+	jsonBytes, _ := json.Marshal(response)
+	utils.SendJSONResponse(w, string(jsonBytes))
 }
 
 // HandlePurgePrefix handles cache prefix purge requests
@@ -117,11 +119,13 @@ func (ah *AdminHandler) HandlePurgePrefix(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	utils.SendJSONResponse(w, map[string]interface{}{
+	response := map[string]interface{}{
 		"success": true,
 		"message": "Cache entries purged successfully",
 		"prefix":  req.Prefix,
-	})
+	}
+	jsonBytes, _ := json.Marshal(response)
+	utils.SendJSONResponse(w, string(jsonBytes))
 }
 
 // HandleStatus handles cache status requests
@@ -163,7 +167,8 @@ func (ah *AdminHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	utils.SendJSONResponse(w, response)
+	jsonBytes, _ := json.Marshal(response)
+	utils.SendJSONResponse(w, string(jsonBytes))
 }
 
 // HandleBan handles Varnish BAN requests
@@ -212,12 +217,14 @@ func (ah *AdminHandler) HandleBan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.SendJSONResponse(w, map[string]interface{}{
+	response := map[string]interface{}{
 		"success":    true,
 		"message":    "BAN executed successfully",
 		"expression": req.Expression,
 		"prefix":     req.Prefix,
-	})
+	}
+	jsonBytes, _ := json.Marshal(response)
+	utils.SendJSONResponse(w, string(jsonBytes))
 }
 
 // getBackendType returns a string representation of the cache backend type

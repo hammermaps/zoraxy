@@ -6,9 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"imuslab.com/zoraxy/mod/cache"
 	"imuslab.com/zoraxy/mod/cachemiddleware"
-	"imuslab.com/zoraxy/mod/optimizer"
 )
 
 // Worker processes optimization jobs in the background

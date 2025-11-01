@@ -2,12 +2,10 @@ package cachemiddleware
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 

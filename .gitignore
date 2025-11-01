@@ -24,10 +24,12 @@ src/*.prof
 src/sys.db
 src/src/sys.db.lock
 src/conf/*
+!src/conf/cache_conf.json.example
 src/ReverseProxy_*_*
 src/Zoraxy_*_*
 src/certs/*
 src/rules/*
+src/conf/cache/*
 src/README.md
 src/mod/acme/test/stackoverflow.pem
 /tools/dns_challenge_update/code-gen/acmedns
