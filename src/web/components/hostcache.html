@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Per-Host Cache Configuration</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+<body>
+    <div class="ui container">
+        <br>
+        <h1 class="ui header">
+            <i class="rocket icon"></i>
+            <div class="content">
+                Per-Host Cache Configuration
+                <div class="sub header">Configure cache settings for individual proxy endpoints</div>
+            </div>
+        </h1>
+        
+        <div class="ui segment">
+            <div class="ui form">
+                <div class="field">
+                    <label>Select Host</label>
+                    <select id="hostnameSelect" class="ui dropdown" onchange="loadHostCacheSettings()">
+                        <option value="">Select a host...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div id="cacheSettingsPanel" class="ui segment" style="display:none;">
+            <h3 class="ui header">Cache Settings for <span id="currentHostname"></span></h3>
+            
+            <div class="ui form">
+                <div class="inline field">
+                    <div class="ui checkbox">
+                        <input type="checkbox" id="useGlobal" onchange="toggleUseGlobal()">
+                        <label>Use Global Cache Settings</label>
+                    </div>
+                </div>
+                
+                <div id="hostSpecificSettings">
+                    <div class="ui divider"></div>
+                    
+                    <div class="inline field">
+                        <div class="ui checkbox">
+                            <input type="checkbox" id="cacheEnabled">
+                            <label>Enable Cache for this Host</label>
+                        </div>
+                    </div>
+                    
+                    <div class="field">
+                        <label>TTL (Time To Live) in seconds</label>
+                        <input type="number" id="cacheTTL" placeholder="3600" min="0">
+                        <small>Set to 0 to use global default</small>
+                    </div>
+                    
+                    <h4 class="ui dividing header">Optimization Settings</h4>
+                    
+                    <div class="inline field">
+                        <div class="ui checkbox">
+                            <input type="checkbox" id="minifyHTML">
+                            <label>Minify HTML</label>
+                        </div>
+                    </div>
+                    
+                    <div class="inline field">
+                        <div class="ui checkbox">
+                            <input type="checkbox" id="minifyCSS">
+                            <label>Minify CSS</label>
+                        </div>
+                    </div>
+                    
+                    <div class="inline field">
+                        <div class="ui checkbox">
+                            <input type="checkbox" id="minifyJS">
+                            <label>Minify JavaScript</label>
+                        </div>
+                    </div>
+                    
+                    <h4 class="ui dividing header">Compression Settings</h4>
+                    
+                    <div class="inline field">
+                        <div class="ui checkbox">
+                            <input type="checkbox" id="compressBr">
+                            <label>Enable Brotli Compression</label>
+                        </div>
+                    </div>
+                    
+                    <div class="inline field">
+                        <div class="ui checkbox">
+                            <input type="checkbox" id="compressGz">
+                            <label>Enable Gzip Compression</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="ui divider"></div>
+                
+                <button class="ui primary button" onclick="saveCacheSettings()">
+                    <i class="save icon"></i> Save Settings
+                </button>
+                
+                <button class="ui button" onclick="loadHostCacheSettings()">
+                    <i class="undo icon"></i> Reset
+                </button>
+            </div>
+        </div>
+        
+        <div class="ui message info">
+            <div class="header">About Per-Host Cache Settings</div>
+            <ul class="list">
+                <li>You can configure cache settings individually for each proxy endpoint</li>
+                <li>When "Use Global Cache Settings" is enabled, the host will use the system-wide cache configuration</li>
+                <li>TTL (Time To Live) controls how long content is cached before being refreshed</li>
+                <li>Minification reduces file size by removing unnecessary characters</li>
+                <li>Brotli compression typically provides better compression than Gzip</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="script/jquery.min.js"></script>
+    <script src="script/semantic/semantic.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            loadHostList();
+            $('.ui.checkbox').checkbox();
+            $('.ui.dropdown').dropdown();
+        });
+        
+        function loadHostList() {
+            $.get("/api/proxy/list", function(data) {
+                var select = $('#hostnameSelect');
+                select.empty();
+                select.append('<option value="">Select a host...</option>');
+                
+                if (data) {
+                    data.forEach(function(proxy) {
+                        if (proxy.Root && proxy.Root !== "") {
+                            select.append('<option value="' + escapeHtml(proxy.Root) + '">' + escapeHtml(proxy.Root) + '</option>');
+                        }
+                    });
+                }
+            });
+        }
+        
+        function loadHostCacheSettings() {
+            var hostname = $('#hostnameSelect').val();
+            if (!hostname) {
+                $('#cacheSettingsPanel').hide();
+                return;
+            }
+            
+            $('#currentHostname').text(hostname);
+            
+            $.get("/api/proxy/cache/get?hostname=" + encodeURIComponent(hostname), function(data) {
+                if (data) {
+                    // Set checkbox states
+                    $('#useGlobal').prop('checked', data.use_global || false);
+                    $('#cacheEnabled').prop('checked', data.enabled || false);
+                    $('#minifyHTML').prop('checked', data.minify_html || false);
+                    $('#minifyCSS').prop('checked', data.minify_css || false);
+                    $('#minifyJS').prop('checked', data.minify_js || false);
+                    $('#compressBr').prop('checked', data.compress_br || false);
+                    $('#compressGz').prop('checked', data.compress_gz || false);
+                    
+                    // Set TTL
+                    $('#cacheTTL').val(data.ttl || 0);
+                    
+                    // Update checkbox UI
+                    $('.ui.checkbox').checkbox('refresh');
+                    
+                    // Toggle settings visibility
+                    toggleUseGlobal();
+                    
+                    $('#cacheSettingsPanel').show();
+                }
+            }).fail(function() {
+                alert('Failed to load cache settings for ' + hostname);
+            });
+        }
+        
+        function toggleUseGlobal() {
+            var useGlobal = $('#useGlobal').is(':checked');
+            if (useGlobal) {
+                $('#hostSpecificSettings').hide();
+            } else {
+                $('#hostSpecificSettings').show();
+            }
+        }
+        
+        function saveCacheSettings() {
+            var hostname = $('#hostnameSelect').val();
+            if (!hostname) {
+                alert('Please select a host');
+                return;
+            }
+            
+            var settings = {
+                use_global: $('#useGlobal').is(':checked'),
+                enabled: $('#cacheEnabled').is(':checked'),
+                ttl: parseInt($('#cacheTTL').val()) || 0,
+                minify_html: $('#minifyHTML').is(':checked'),
+                minify_css: $('#minifyCSS').is(':checked'),
+                minify_js: $('#minifyJS').is(':checked'),
+                compress_br: $('#compressBr').is(':checked'),
+                compress_gz: $('#compressGz').is(':checked')
+            };
+            
+            $.ajax({
+                url: "/api/proxy/cache/set?hostname=" + encodeURIComponent(hostname),
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(settings),
+                success: function() {
+                    alert('Cache settings saved successfully for ' + hostname);
+                },
+                error: function() {
+                    alert('Failed to save cache settings');
+                }
+            });
+        }
+        
+        function escapeHtml(text) {
+            var map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>

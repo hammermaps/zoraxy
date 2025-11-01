@@ -177,6 +177,24 @@ type AuthenticationProvider struct {
 	ForwardAuthRequestExcludedCookies []string // List of cookies to exclude from the request after sending it to the forward auth server.
 }
 
+/*
+	Cache Settings
+
+	Per-host cache configuration that can override global cache settings
+*/
+
+// HostCacheSettings holds per-host cache configuration
+type HostCacheSettings struct {
+	Enabled      bool `json:"enabled"`       // Enable/disable cache for this host
+	TTL          int  `json:"ttl"`           // TTL in seconds, 0 means use global default
+	MinifyCSS    bool `json:"minify_css"`    // Enable CSS minification
+	MinifyJS     bool `json:"minify_js"`     // Enable JS minification
+	MinifyHTML   bool `json:"minify_html"`   // Enable HTML minification
+	CompressBr   bool `json:"compress_br"`   // Enable Brotli compression
+	CompressGz   bool `json:"compress_gz"`   // Enable Gzip compression
+	UseGlobal    bool `json:"use_global"`    // Use global cache settings instead of host-specific
+}
+
 // A proxy endpoint record, a general interface for handling inbound routing
 type ProxyEndpoint struct {
 	ProxyType            ProxyType               //The type of this proxy, see const def
@@ -219,6 +237,9 @@ type ProxyEndpoint struct {
 	//Fallback routing logic (Special Rule Sets Only)
 	DefaultSiteOption int    //Fallback routing logic options
 	DefaultSiteValue  string //Fallback routing target, optional
+
+	//Cache Settings (Per-host cache configuration)
+	CacheSettings *HostCacheSettings //Cache settings for this endpoint, if nil, use global cache settings
 
 	//Internal Logic Elements
 	parent *Router  `json:"-"`

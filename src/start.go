@@ -35,6 +35,7 @@ import (
 	"imuslab.com/zoraxy/mod/sshprox"
 	"imuslab.com/zoraxy/mod/statistic"
 	"imuslab.com/zoraxy/mod/statistic/analytic"
+	"imuslab.com/zoraxy/mod/hoststats"
 	"imuslab.com/zoraxy/mod/streamproxy"
 	"imuslab.com/zoraxy/mod/tlscert"
 	"imuslab.com/zoraxy/mod/webserv"
@@ -202,6 +203,14 @@ func startupSequence() {
 		panic(err)
 	}
 	statisticCollector.SetAutoSave(STATISTIC_AUTO_SAVE_INTERVAL)
+
+	//Create a host statistics collector
+	hostStatsCollector, err = hoststats.NewCollector(hoststats.CollectorOption{
+		Database: sysdb,
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	//Start the static web server
 	staticWebServer = webserv.NewWebServer(&webserv.WebServerOptions{
@@ -435,6 +444,11 @@ func ShutdownSeq() {
 	SystemWideLogger.Println("Closing Statistic Collector")
 	if statisticCollector != nil {
 		statisticCollector.Close()
+	}
+
+	SystemWideLogger.Println("Closing Host Statistics Collector")
+	if hostStatsCollector != nil {
+		hostStatsCollector.Close()
 	}
 
 	if mdnsTickerStop != nil {
