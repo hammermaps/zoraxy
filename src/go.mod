@@ -37,7 +37,9 @@ require (
 	github.com/aziontech/azionapi-go-sdk v0.143.0 // indirect
 	github.com/baidubce/bce-sdk-go v0.9.250 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dnsimple/dnsimple-go/v4 v4.0.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-acme/alidns-20150109/v4 v4.6.1 // indirect
@@ -50,6 +52,7 @@ require (
 	github.com/namedotcom/go/v4 v4.0.2 // indirect
 	github.com/nrdcg/goacmedns v0.2.0 // indirect
 	github.com/nrdcg/vegadns v0.3.0 // indirect
+	github.com/redis/go-redis/v9 v9.16.0 // indirect
 	github.com/regfish/regfish-dnsapi-go v0.1.1 // indirect
 	github.com/yandex-cloud/go-sdk/services/dns v0.0.16 // indirect
 	github.com/yandex-cloud/go-sdk/v2 v2.24.0 // indirect
