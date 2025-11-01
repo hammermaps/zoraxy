@@ -35,6 +35,7 @@ import (
 	"imuslab.com/zoraxy/mod/sshprox"
 	"imuslab.com/zoraxy/mod/statistic"
 	"imuslab.com/zoraxy/mod/statistic/analytic"
+	"imuslab.com/zoraxy/mod/hoststats"
 	"imuslab.com/zoraxy/mod/streamproxy"
 	"imuslab.com/zoraxy/mod/tlscert"
 	"imuslab.com/zoraxy/mod/uptime"
@@ -144,6 +145,7 @@ var (
 	accessController   *access.Controller        //Access controller, handle black list and white list
 	netstatBuffers     *netstat.NetStatBuffers   //Realtime graph buffers
 	statisticCollector *statistic.Collector      //Collecting statistic from visitors
+	hostStatsCollector *hoststats.Collector      //Per-host statistics collector
 	uptimeMonitor      *uptime.Monitor           //Uptime monitor service worker
 	mdnsScanner        *mdns.MDNSHost            //mDNS discovery services
 	webSshManager      *sshprox.Manager          //Web SSH connection service

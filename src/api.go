@@ -68,6 +68,9 @@ func RegisterHTTPProxyAPIs(authRouter *auth.RouterDef) {
 	authRouter.HandleFunc("/api/proxy/auth/exceptions/list", ListProxyBasicAuthExceptionPaths)
 	authRouter.HandleFunc("/api/proxy/auth/exceptions/add", AddProxyBasicAuthExceptionPaths)
 	authRouter.HandleFunc("/api/proxy/auth/exceptions/delete", RemoveProxyBasicAuthExceptionPaths)
+	/* Per-host cache settings */
+	authRouter.HandleFunc("/api/proxy/cache/get", HandleGetHostCacheSettings)
+	authRouter.HandleFunc("/api/proxy/cache/set", HandleSetHostCacheSettings)
 }
 
 // Register the APIs for TLS / SSL certificate management functions
@@ -155,6 +158,11 @@ func RegisterStatisticalAPIs(authRouter *auth.RouterDef) {
 	authRouter.HandleFunc("/api/analytic/resetRange", AnalyticLoader.HandleRangeReset)
 	/* UpTime Monitor */
 	authRouter.HandleFunc("/api/utm/list", HandleUptimeMonitorListing)
+	/* Host Statistics */
+	authRouter.HandleFunc("/api/stats/hosts", hostStatsCollector.HandleGetHostList)
+	authRouter.HandleFunc("/api/stats/host", hostStatsCollector.HandleGetHostStats)
+	authRouter.HandleFunc("/api/stats/host/bandwidth", hostStatsCollector.HandleGetHostBandwidth)
+	authRouter.HandleFunc("/api/stats/host/reset", hostStatsCollector.HandleResetHostStats)
 }
 
 // Register the APIs for Stream (TCP / UDP) Proxy management functions
