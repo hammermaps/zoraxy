@@ -52,7 +52,9 @@ For other systems or architectures, please see [Releases](https://github.com/tob
 
 ## Getting Started
 
-[Installing Zoraxy Reverse Proxy: Your Gateway to Efficient Web Routing](https://geekscircuit.com/installing-zoraxy-reverse-proxy-your-gateway-to-efficient-web-routing/)
+**Quick Start Guides:**
+- 🇩🇪 [Schnellstart Anleitung (German)](SCHNELLSTART.md) - Comprehensive German quick start guide
+- 🇬🇧 [Installing Zoraxy Reverse Proxy: Your Gateway to Efficient Web Routing](https://geekscircuit.com/installing-zoraxy-reverse-proxy-your-gateway-to-efficient-web-routing/)
 
 Thank you for the well written and easy to follow tutorial by Reddit user [itsvmn](https://www.reddit.com/user/itsvmn/)! 
 If you have no background in setting up reverse proxy or web routing, you should check this out before you start setting up your Zoraxy. 
@@ -69,6 +71,16 @@ go build
 
 sudo ./zoraxy -port=:8000
 ```
+
+### Automated Builds with Jenkins
+
+For automated CI/CD builds using Jenkins, see the [Jenkins Setup Guide](.jenkins/setup-guide.md).
+
+**Quick Links:**
+- [Jenkinsfile](Jenkinsfile) - Standard Jenkins pipeline
+- [Jenkinsfile.advanced](Jenkinsfile.advanced) - Advanced pipeline with testing and security scans
+- [Build Configuration](.jenkins/build-config.yml) - Build parameters and settings
+- [Jenkins Setup Guide](.jenkins/setup-guide.md) - Complete installation and configuration guide
 
 ## Usage
 

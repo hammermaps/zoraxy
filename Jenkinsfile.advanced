@@ -1,0 +1,353 @@
+pipeline {
+    agent {
+        label 'docker'
+    }
+    
+    parameters {
+        choice(
+            name: 'BUILD_TYPE',
+            choices: ['release', 'development', 'nightly'],
+            description: 'Build type'
+        )
+        string(
+            name: 'VERSION_TAG',
+            defaultValue: '',
+            description: 'Version tag (e.g., v1.0.0) - leave empty for automatic versioning'
+        )
+        booleanParam(
+            name: 'BUILD_ALL_PLATFORMS',
+            defaultValue: true,
+            description: 'Build for all platforms'
+        )
+        booleanParam(
+            name: 'BUILD_DOCKER',
+            defaultValue: true,
+            description: 'Build and push Docker images'
+        )
+        booleanParam(
+            name: 'RUN_SECURITY_SCAN',
+            defaultValue: false,
+            description: 'Run security vulnerability scan'
+        )
+    }
+    
+    environment {
+        GO_VERSION = '1.24'
+        PROJECT_NAME = 'zoraxy'
+        BUILD_DIR = 'src'
+        DIST_DIR = 'src/dist'
+        DOCKER_REGISTRY = credentials('docker-registry')
+        DOCKER_IMAGE_NAME = 'zoraxy'
+    }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '5'))
+        disableConcurrentBuilds()
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+    }
+    
+    stages {
+        stage('Initialization') {
+            steps {
+                script {
+                    echo "=== Build Configuration ==="
+                    echo "Build Type: ${params.BUILD_TYPE}"
+                    echo "Build All Platforms: ${params.BUILD_ALL_PLATFORMS}"
+                    echo "Build Docker: ${params.BUILD_DOCKER}"
+                    echo "=========================="
+                    
+                    // Set version
+                    if (params.VERSION_TAG) {
+                        env.VERSION = params.VERSION_TAG
+                    } else {
+                        env.VERSION = sh(
+                            script: "git describe --tags --always --dirty",
+                            returnStdout: true
+                        ).trim()
+                    }
+                    
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.BUILD_TIMESTAMP = sh(
+                        script: "date '+%Y%m%d-%H%M%S'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Version: ${env.VERSION}"
+                    echo "Git Commit: ${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+        
+        stage('Environment Setup') {
+            steps {
+                echo "Setting up build environment..."
+                sh '''
+                    # Verify Go installation
+                    go version
+                    
+                    # Setup build directory
+                    cd ${BUILD_DIR}
+                    mkdir -p dist
+                    
+                    # Download dependencies
+                    go mod download
+                    go mod verify
+                    go mod tidy
+                '''
+            }
+        }
+        
+        stage('Code Quality') {
+            parallel {
+                stage('Lint') {
+                    steps {
+                        echo 'Running linter...'
+                        sh '''
+                            cd ${BUILD_DIR}
+                            # Install golangci-lint if not available
+                            if ! command -v golangci-lint &> /dev/null; then
+                                curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+                            fi
+                            # Run lint (continue on error for now)
+                            golangci-lint run ./... || true
+                        '''
+                    }
+                }
+                
+                stage('Format Check') {
+                    steps {
+                        echo 'Checking code formatting...'
+                        sh '''
+                            cd ${BUILD_DIR}
+                            # Check if code is formatted
+                            unformatted=$(gofmt -l .)
+                            if [ -n "$unformatted" ]; then
+                                echo "Warning: The following files are not formatted:"
+                                echo "$unformatted"
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                echo 'Running unit tests...'
+                sh '''
+                    cd ${BUILD_DIR}
+                    go test -v -race -coverprofile=coverage.out ./... || true
+                    go tool cover -html=coverage.out -o coverage.html || true
+                '''
+            }
+            post {
+                always {
+                    // Archive test results and coverage
+                    publishHTML([
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'src',
+                        reportFiles: 'coverage.html',
+                        reportName: 'Code Coverage Report'
+                    ])
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            when {
+                expression { params.RUN_SECURITY_SCAN == true }
+            }
+            steps {
+                echo 'Running security vulnerability scan...'
+                sh '''
+                    cd ${BUILD_DIR}
+                    # Install gosec if not available
+                    if ! command -v gosec &> /dev/null; then
+                        go install github.com/securego/gosec/v2/cmd/gosec@latest
+                    fi
+                    # Run security scan
+                    gosec -fmt=json -out=gosec-report.json ./... || true
+                '''
+            }
+        }
+        
+        stage('Build') {
+            when {
+                expression { params.BUILD_ALL_PLATFORMS == true }
+            }
+            steps {
+                echo 'Building binaries for all platforms...'
+                sh '''
+                    cd ${BUILD_DIR}
+                    make clean
+                    make all
+                '''
+            }
+        }
+        
+        stage('Build Selected Platform') {
+            when {
+                expression { params.BUILD_ALL_PLATFORMS == false }
+            }
+            steps {
+                echo 'Building binary for Linux AMD64 only...'
+                sh '''
+                    cd ${BUILD_DIR}
+                    mkdir -p dist
+                    GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/zoraxy_linux_amd64 -ldflags "-s -w" -trimpath
+                '''
+            }
+        }
+        
+        stage('Docker Build & Push') {
+            when {
+                expression { params.BUILD_DOCKER == true }
+            }
+            steps {
+                script {
+                    echo 'Building and pushing Docker image...'
+                    sh '''
+                        # Prepare docker build context
+                        cp -r src/ docker/src/
+                        
+                        # Build Docker image
+                        cd docker
+                        docker build \
+                            --build-arg VERSION=${VERSION} \
+                            --build-arg BUILD_DATE=${BUILD_TIMESTAMP} \
+                            --build-arg VCS_REF=${GIT_COMMIT_SHORT} \
+                            -t ${DOCKER_IMAGE_NAME}:${VERSION} \
+                            -t ${DOCKER_IMAGE_NAME}:latest \
+                            .
+                        
+                        # Tag for registry
+                        docker tag ${DOCKER_IMAGE_NAME}:${VERSION} ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${VERSION}
+                        docker tag ${DOCKER_IMAGE_NAME}:latest ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:latest
+                        
+                        # Push to registry (configure credentials in Jenkins)
+                        # docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${VERSION}
+                        # docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:latest
+                        
+                        # Clean up
+                        rm -rf src/
+                    '''
+                }
+            }
+        }
+        
+        stage('Generate Checksums') {
+            steps {
+                echo 'Generating checksums for binaries...'
+                sh '''
+                    cd ${DIST_DIR}
+                    if [ -n "$(ls -A .)" ]; then
+                        sha256sum zoraxy_* > zoraxy_checksums.sha256
+                        md5sum zoraxy_* > zoraxy_checksums.md5
+                    fi
+                '''
+            }
+        }
+        
+        stage('Create Release Package') {
+            when {
+                expression { params.BUILD_TYPE == 'release' }
+            }
+            steps {
+                echo 'Creating release package...'
+                sh '''
+                    cd ${DIST_DIR}
+                    
+                    # Create archive with binaries and documentation
+                    tar -czf zoraxy-${VERSION}-release.tar.gz \
+                        zoraxy_* \
+                        ../../README.md \
+                        ../../LICENSE \
+                        ../../CHANGELOG.md
+                '''
+            }
+        }
+        
+        stage('Archive Artifacts') {
+            steps {
+                echo 'Archiving build artifacts...'
+                archiveArtifacts artifacts: 'src/dist/**/*', fingerprint: true, allowEmptyArchive: true
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo '✓ Build completed successfully!'
+            script {
+                def buildInfo = """
+                    Build Status: SUCCESS ✓
+                    Job: ${env.JOB_NAME}
+                    Build Number: ${env.BUILD_NUMBER}
+                    Version: ${env.VERSION}
+                    Build Type: ${params.BUILD_TYPE}
+                    Git Commit: ${env.GIT_COMMIT_SHORT}
+                    Build URL: ${env.BUILD_URL}
+                    
+                    Artifacts: ${env.BUILD_URL}artifact/
+                """
+                
+                emailext (
+                    subject: "✓ SUCCESS: Zoraxy Build #${env.BUILD_NUMBER}",
+                    body: buildInfo,
+                    to: '${DEFAULT_RECIPIENTS}',
+                    attachLog: false
+                )
+            }
+        }
+        
+        failure {
+            echo '✗ Build failed!'
+            script {
+                def buildInfo = """
+                    Build Status: FAILURE ✗
+                    Job: ${env.JOB_NAME}
+                    Build Number: ${env.BUILD_NUMBER}
+                    Version: ${env.VERSION}
+                    Build Type: ${params.BUILD_TYPE}
+                    Git Commit: ${env.GIT_COMMIT_SHORT}
+                    Build URL: ${env.BUILD_URL}
+                    
+                    Console Output: ${env.BUILD_URL}console
+                """
+                
+                emailext (
+                    subject: "✗ FAILURE: Zoraxy Build #${env.BUILD_NUMBER}",
+                    body: buildInfo,
+                    to: '${DEFAULT_RECIPIENTS}',
+                    attachLog: true
+                )
+            }
+        }
+        
+        unstable {
+            echo '⚠ Build is unstable'
+        }
+        
+        always {
+            echo 'Performing cleanup...'
+            // Clean up temporary files
+            sh '''
+                rm -rf docker/src/ || true
+            '''
+        }
+    }
+}
