@@ -34,6 +34,7 @@ require (
 	github.com/alibabacloud-go/tea v1.3.13 // indirect
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.7 // indirect
 	github.com/aliyun/credentials-go v1.4.7 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/aziontech/azionapi-go-sdk v0.143.0 // indirect
 	github.com/baidubce/bce-sdk-go v0.9.250 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -54,6 +55,8 @@ require (
 	github.com/nrdcg/vegadns v0.3.0 // indirect
 	github.com/redis/go-redis/v9 v9.16.0 // indirect
 	github.com/regfish/regfish-dnsapi-go v0.1.1 // indirect
+	github.com/tdewolff/minify/v2 v2.24.5 // indirect
+	github.com/tdewolff/parse/v2 v2.8.5-0.20251020133559-0efcf90bef1a // indirect
 	github.com/yandex-cloud/go-sdk/services/dns v0.0.16 // indirect
 	github.com/yandex-cloud/go-sdk/v2 v2.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
