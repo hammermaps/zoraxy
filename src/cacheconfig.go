@@ -215,7 +215,27 @@ func BuildCacheMiddlewareConfig(config *CacheConfiguration, store cache.CacheSto
 		OptimizationMode:     optMode,
 		OptimizationPipeline: pipeline,
 		WorkerQueue:          worker,
+		OnCacheEvent:         handleCacheEvent,
 	}
 
 	return middlewareConfig, nil
+}
+
+// handleCacheEvent is called when cache events occur
+func handleCacheEvent(hostname string, eventType string, size int64) {
+	if hostStatsCollector == nil {
+		return
+	}
+
+	switch eventType {
+	case "hit":
+		hostStatsCollector.RecordRequest(hostname, true)
+	case "miss":
+		hostStatsCollector.RecordRequest(hostname, false)
+	case "put":
+		hostStatsCollector.RecordCacheData(hostname, size, 1)
+	case "traffic":
+		// Record bytes sent (traffic out)
+		hostStatsCollector.RecordTraffic(hostname, size, 0)
+	}
 }

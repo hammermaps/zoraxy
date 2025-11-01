@@ -41,6 +41,9 @@ type Config struct {
 
 	// WorkerQueue is the queue for async optimization jobs
 	WorkerQueue JobQueue
+
+	// OnCacheEvent is called when cache events occur (hit, miss, put)
+	OnCacheEvent func(hostname string, eventType string, size int64)
 }
 
 // OptimizationMode specifies when optimization should occur
@@ -137,12 +140,26 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if found {
 		// Cache hit - serve from cache
 		m.stats.incrementHits()
+		
+		// Notify about cache hit
+		if m.config.OnCacheEvent != nil {
+			hostname := r.Host
+			m.config.OnCacheEvent(hostname, "hit", 0)
+		}
+		
 		m.serveCachedResponse(w, r, reader, meta)
 		return
 	}
 
 	// Cache miss - fetch from upstream and cache
 	m.stats.incrementMisses()
+	
+	// Notify about cache miss
+	if m.config.OnCacheEvent != nil {
+		hostname := r.Host
+		m.config.OnCacheEvent(hostname, "miss", 0)
+	}
+	
 	m.fetchAndCache(w, r, key)
 }
 
@@ -203,8 +220,14 @@ func (m *Middleware) serveCachedResponse(w http.ResponseWriter, r *http.Request,
 	// Write status code
 	w.WriteHeader(meta.StatusCode)
 
-	// Stream response body
-	io.Copy(w, reader)
+	// Stream response body and track bytes sent
+	bytesSent, _ := io.Copy(w, reader)
+	
+	// Notify about traffic
+	if m.config.OnCacheEvent != nil && bytesSent > 0 {
+		hostname := r.Host
+		m.config.OnCacheEvent(hostname, "traffic", bytesSent)
+	}
 }
 
 // fetchAndCache fetches from upstream and caches the response
@@ -223,13 +246,13 @@ func (m *Middleware) fetchAndCache(w http.ResponseWriter, r *http.Request, key s
 	// Check if response is cacheable
 	if !cache.IsResponseCacheable(recorder.statusCode, recorder.headers) {
 		// Write captured response and return
-		m.writeRecordedResponse(w, recorder)
+		m.writeRecordedResponse(w, recorder, r)
 		return
 	}
 
 	// Check size limit
 	if int64(recorder.body.Len()) > m.config.MaxCacheSize {
-		m.writeRecordedResponse(w, recorder)
+		m.writeRecordedResponse(w, recorder, r)
 		return
 	}
 
@@ -284,15 +307,21 @@ func (m *Middleware) fetchAndCache(w http.ResponseWriter, r *http.Request, key s
 	err := m.config.Store.Put(r.Context(), key, bytes.NewReader(bodyBytes), meta)
 	if err == nil {
 		m.stats.incrementPuts()
+		
+		// Notify about cache put
+		if m.config.OnCacheEvent != nil {
+			hostname := r.Host
+			m.config.OnCacheEvent(hostname, "put", int64(len(bodyBytes)))
+		}
 	}
 
 	// Write response to client
 	w.Header().Set("X-Cache", "MISS")
-	m.writeRecordedResponse(w, recorder)
+	m.writeRecordedResponse(w, recorder, r)
 }
 
 // writeRecordedResponse writes a recorded response to the client
-func (m *Middleware) writeRecordedResponse(w http.ResponseWriter, recorder *responseRecorder) {
+func (m *Middleware) writeRecordedResponse(w http.ResponseWriter, recorder *responseRecorder, r *http.Request) {
 	// Copy headers
 	for k, values := range recorder.headers {
 		for _, v := range values {
@@ -304,7 +333,14 @@ func (m *Middleware) writeRecordedResponse(w http.ResponseWriter, recorder *resp
 	w.WriteHeader(recorder.statusCode)
 
 	// Write body
-	w.Write(recorder.body.Bytes())
+	bodyBytes := recorder.body.Bytes()
+	w.Write(bodyBytes)
+	
+	// Notify about traffic
+	if m.config.OnCacheEvent != nil && len(bodyBytes) > 0 {
+		hostname := r.Host
+		m.config.OnCacheEvent(hostname, "traffic", int64(len(bodyBytes)))
+	}
 }
 
 // responseRecorder captures an HTTP response

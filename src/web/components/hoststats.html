@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Host Statistics</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+<body>
+    <div class="ui container">
+        <br>
+        <h1 class="ui header">
+            <i class="chart line icon"></i>
+            <div class="content">
+                Host Statistics
+                <div class="sub header">Per-host performance and cache statistics</div>
+            </div>
+        </h1>
+        
+        <div class="ui segment">
+            <h3 class="ui header">Overview</h3>
+            <div id="hostList" class="ui relaxed divided list">
+                <div class="ui active centered inline loader"></div>
+            </div>
+        </div>
+        
+        <div class="ui modal" id="hostDetailModal">
+            <i class="close icon"></i>
+            <div class="header">
+                Host Statistics: <span id="modalHostname"></span>
+            </div>
+            <div class="content">
+                <div class="ui statistics">
+                    <div class="statistic">
+                        <div class="value" id="statTotalRequests">-</div>
+                        <div class="label">Total Requests</div>
+                    </div>
+                    <div class="statistic">
+                        <div class="value" id="statCacheHitRate">-</div>
+                        <div class="label">Cache Hit Rate</div>
+                    </div>
+                    <div class="statistic">
+                        <div class="value" id="statBytesSent">-</div>
+                        <div class="label">Bytes Sent</div>
+                    </div>
+                    <div class="statistic">
+                        <div class="value" id="statMaxBandwidth">-</div>
+                        <div class="label">Max Bandwidth</div>
+                    </div>
+                </div>
+                
+                <h4 class="ui dividing header">Bandwidth Graph</h4>
+                <canvas id="bandwidthChart" width="400" height="200"></canvas>
+                
+                <h4 class="ui dividing header">Cache Statistics</h4>
+                <table class="ui celled table">
+                    <tbody>
+                        <tr>
+                            <td><strong>Cached Requests</strong></td>
+                            <td id="statCachedRequests">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cache Misses</strong></td>
+                            <td id="statCacheMisses">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cached Objects</strong></td>
+                            <td id="statCachedObjects">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cached Data Size</strong></td>
+                            <td id="statCachedDataSize">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h4 class="ui dividing header">Traffic Statistics</h4>
+                <table class="ui celled table">
+                    <tbody>
+                        <tr>
+                            <td><strong>Bytes Received</strong></td>
+                            <td id="statBytesReceived">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Current Bandwidth</strong></td>
+                            <td id="statCurrentBandwidth">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Min Bandwidth</strong></td>
+                            <td id="statMinBandwidth">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <div class="ui black deny button">
+                    Close
+                </div>
+                <div class="ui red button" onclick="resetHostStats()">
+                    <i class="trash icon"></i> Reset Statistics
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script/jquery.min.js"></script>
+    <script src="script/semantic/semantic.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        var currentHostname = "";
+        var bandwidthChart = null;
+        
+        // Load host list on page load
+        $(document).ready(function() {
+            loadHostList();
+            // Refresh every 30 seconds
+            setInterval(loadHostList, 30000);
+        });
+        
+        function loadHostList() {
+            $.get("/api/stats/hosts", function(data) {
+                var html = '';
+                if (data && data.length > 0) {
+                    data.forEach(function(host) {
+                        var hitRate = host.cache_hit_rate ? host.cache_hit_rate.toFixed(2) : '0.00';
+                        var bytesSent = formatBytes(host.bytes_sent || 0);
+                        var maxBandwidth = formatBandwidth(host.max_bandwidth || 0);
+                        
+                        html += '<div class="item">';
+                        html += '<div class="content">';
+                        html += '<div class="header">' + escapeHtml(host.hostname) + '</div>';
+                        html += '<div class="description">';
+                        html += 'Requests: ' + (host.total_requests || 0) + ' | ';
+                        html += 'Cache Hit Rate: ' + hitRate + '% | ';
+                        html += 'Data Sent: ' + bytesSent + ' | ';
+                        html += 'Max Bandwidth: ' + maxBandwidth;
+                        html += '</div>';
+                        html += '<div class="ui right floated">';
+                        html += '<button class="ui small primary button" onclick="showHostDetail(\'' + escapeHtml(host.hostname) + '\')">View Details</button>';
+                        html += '</div>';
+                        html += '</div>';
+                        html += '</div>';
+                    });
+                } else {
+                    html = '<div class="ui message">No host statistics available yet.</div>';
+                }
+                $('#hostList').html(html);
+            }).fail(function() {
+                $('#hostList').html('<div class="ui error message">Failed to load host statistics.</div>');
+            });
+        }
+        
+        function showHostDetail(hostname) {
+            currentHostname = hostname;
+            $('#modalHostname').text(hostname);
+            
+            // Load detailed statistics
+            $.get("/api/stats/host?hostname=" + encodeURIComponent(hostname), function(data) {
+                if (data) {
+                    $('#statTotalRequests').text(data.total_requests || 0);
+                    $('#statCacheHitRate').text((data.cache_hit_rate || 0).toFixed(2) + '%');
+                    $('#statBytesSent').text(formatBytes(data.bytes_sent || 0));
+                    $('#statMaxBandwidth').text(formatBandwidth(data.max_bandwidth || 0));
+                    
+                    $('#statCachedRequests').text(data.cached_requests || 0);
+                    $('#statCacheMisses').text(data.cache_misses || 0);
+                    $('#statCachedObjects').text(data.cached_objects || 0);
+                    $('#statCachedDataSize').text(formatBytes(data.cached_data_size || 0));
+                    
+                    $('#statBytesReceived').text(formatBytes(data.bytes_received || 0));
+                    $('#statCurrentBandwidth').text(formatBandwidth(data.current_bandwidth || 0));
+                    $('#statMinBandwidth').text(formatBandwidth(data.min_bandwidth || 0));
+                    
+                    // Load bandwidth chart
+                    loadBandwidthChart(hostname);
+                }
+            });
+            
+            $('#hostDetailModal').modal('show');
+        }
+        
+        function loadBandwidthChart(hostname) {
+            $.get("/api/stats/host/bandwidth?hostname=" + encodeURIComponent(hostname), function(data) {
+                if (data && data.samples) {
+                    var labels = [];
+                    var values = [];
+                    
+                    data.samples.forEach(function(sample) {
+                        var date = new Date(sample.timestamp);
+                        labels.push(date.toLocaleTimeString());
+                        values.push(sample.bytes_per_second);
+                    });
+                    
+                    var ctx = document.getElementById('bandwidthChart').getContext('2d');
+                    
+                    if (bandwidthChart) {
+                        bandwidthChart.destroy();
+                    }
+                    
+                    bandwidthChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Bandwidth (bytes/sec)',
+                                data: values,
+                                borderColor: 'rgb(75, 192, 192)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        
+        function resetHostStats() {
+            if (!confirm('Are you sure you want to reset statistics for ' + currentHostname + '?')) {
+                return;
+            }
+            
+            $.post("/api/stats/host/reset?hostname=" + encodeURIComponent(currentHostname), function() {
+                $('#hostDetailModal').modal('hide');
+                loadHostList();
+            }).fail(function() {
+                alert('Failed to reset statistics');
+            });
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            var k = 1024;
+            var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatBandwidth(bytesPerSec) {
+            if (bytesPerSec === 0) return '0 B/s';
+            var k = 1024;
+            var sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+            var i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
+            return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function escapeHtml(text) {
+            var map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>
