@@ -130,27 +130,37 @@ func MinifyTransform(config MinifyConfig) Transform {
 func shouldMinify(contentType string, config MinifyConfig) bool {
 	ct := strings.ToLower(contentType)
 
-	if config.HTML && (ct == "text/html" || strings.Contains(ct, "html")) {
+	// Check HTML - be specific to avoid false matches
+	if config.HTML && (ct == "text/html" || strings.HasPrefix(ct, "text/html;")) {
 		return true
 	}
 
-	if config.CSS && (ct == "text/css" || strings.Contains(ct, "css")) {
+	// Check CSS - be specific to avoid false matches
+	if config.CSS && (ct == "text/css" || strings.HasPrefix(ct, "text/css;")) {
 		return true
 	}
 
-	if config.JS && (strings.Contains(ct, "javascript") || ct == "application/x-javascript") {
+	// Check JavaScript - check common variations
+	if config.JS && (ct == "text/javascript" || ct == "application/javascript" ||
+		ct == "application/x-javascript" || strings.HasPrefix(ct, "text/javascript;") ||
+		strings.HasPrefix(ct, "application/javascript;") ||
+		strings.HasPrefix(ct, "application/x-javascript;")) {
 		return true
 	}
 
-	if config.JSON && strings.Contains(ct, "json") {
+	// Check JSON - be specific with standard types
+	if config.JSON && (ct == "application/json" || strings.HasPrefix(ct, "application/json;")) {
 		return true
 	}
 
-	if config.SVG && (ct == "image/svg+xml" || strings.Contains(ct, "svg")) {
+	// Check SVG - exact match only
+	if config.SVG && (ct == "image/svg+xml" || strings.HasPrefix(ct, "image/svg+xml;")) {
 		return true
 	}
 
-	if config.XML && (ct == "application/xml" || ct == "text/xml") {
+	// Check XML - exact matches only
+	if config.XML && (ct == "application/xml" || ct == "text/xml" ||
+		strings.HasPrefix(ct, "application/xml;") || strings.HasPrefix(ct, "text/xml;")) {
 		return true
 	}
 

@@ -1,6 +1,7 @@
 package optimizer
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -84,7 +85,7 @@ func (p *Pipeline) Apply(ctx context.Context, in io.Reader, meta *cache.Meta) (i
 
 // ApplyToBytes is a convenience method that applies the pipeline to byte data
 func (p *Pipeline) ApplyToBytes(ctx context.Context, data []byte, meta *cache.Meta) ([]byte, *cache.Meta, error) {
-	reader := io.NopCloser(io.Reader(readerFromBytes(data)))
+	reader := io.NopCloser(bytes.NewReader(data))
 	result, resultMeta, err := p.Apply(ctx, reader, meta)
 	if err != nil {
 		return nil, nil, err
@@ -98,22 +99,4 @@ func (p *Pipeline) ApplyToBytes(ctx context.Context, data []byte, meta *cache.Me
 	}
 
 	return resultBytes, resultMeta, nil
-}
-
-type bytesReader struct {
-	data []byte
-	pos  int
-}
-
-func readerFromBytes(data []byte) io.Reader {
-	return &bytesReader{data: data, pos: 0}
-}
-
-func (br *bytesReader) Read(p []byte) (n int, err error) {
-	if br.pos >= len(br.data) {
-		return 0, io.EOF
-	}
-	n = copy(p, br.data[br.pos:])
-	br.pos += n
-	return n, nil
 }

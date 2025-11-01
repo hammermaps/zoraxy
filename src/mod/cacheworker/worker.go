@@ -1,7 +1,9 @@
 package cacheworker
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -166,8 +168,7 @@ func (w *Worker) processJob(workerID int, job cachemiddleware.OptimizationJob) {
 	defer reader.Close()
 
 	// Read content into memory
-	var buf []byte
-	buf, err = readAll(reader)
+	buf, err := io.ReadAll(reader)
 	if err != nil {
 		w.logger.Printf("Worker %d: Failed to read content for key %s: %v", workerID, job.Key, err)
 		return
@@ -181,7 +182,7 @@ func (w *Worker) processJob(workerID int, job cachemiddleware.OptimizationJob) {
 	}
 
 	// Store optimized content back to cache
-	err = job.Store.Put(ctx, job.Key, newBytesReader(optimized), optimizedMeta)
+	err = job.Store.Put(ctx, job.Key, bytes.NewReader(optimized), optimizedMeta)
 	if err != nil {
 		w.logger.Printf("Worker %d: Failed to store optimized content for key %s: %v", workerID, job.Key, err)
 		return
@@ -191,51 +192,7 @@ func (w *Worker) processJob(workerID int, job cachemiddleware.OptimizationJob) {
 		workerID, job.Key, len(buf), len(optimized))
 }
 
-// readAll reads all data from a reader (helper function)
-func readAll(r interface{ Read([]byte) (int, error) }) ([]byte, error) {
-	var buf []byte
-	tmp := make([]byte, 8192)
-	for {
-		n, err := r.Read(tmp)
-		if n > 0 {
-			buf = append(buf, tmp[:n]...)
-		}
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return buf, err
-		}
-	}
-	return buf, nil
-}
 
-// newBytesReader creates a reader from bytes
-func newBytesReader(data []byte) interface {
-	Read([]byte) (int, error)
-} {
-	return &bytesReader{data: data, pos: 0}
-}
-
-type bytesReader struct {
-	data []byte
-	pos  int
-}
-
-func (br *bytesReader) Read(p []byte) (n int, err error) {
-	if br.pos >= len(br.data) {
-		return 0, &eofError{}
-	}
-	n = copy(p, br.data[br.pos:])
-	br.pos += n
-	return n, nil
-}
-
-type eofError struct{}
-
-func (e *eofError) Error() string {
-	return "EOF"
-}
 
 // GetQueueSize returns the current queue size
 func (w *Worker) GetQueueSize() int {
